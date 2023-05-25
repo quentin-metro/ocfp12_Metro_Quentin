@@ -1,4 +1,3 @@
-from django.core.validators import MinValueValidator
 from django.db import models
 from django.contrib.auth.models import User
 
@@ -21,7 +20,7 @@ class Client(models.Model):
 class Contract(models.Model):
     status = models.BooleanField()
     amount = models.FloatField()
-    payement_due = models.DateTimeField(auto_now_add=True)
+    payment_due = models.DateTimeField(auto_now_add=True, editable=True)
     date_created = models.DateTimeField(auto_now_add=True)
     date_updated = models.DateTimeField(auto_now_add=True)
     sales_contact = models.ForeignKey(to=User, on_delete=models.SET_NULL, null=True)
@@ -37,5 +36,6 @@ class Event(models.Model):
     date_created = models.DateTimeField(auto_now_add=True)
     date_updated = models.DateTimeField(auto_now_add=True)
     client = models.ForeignKey(to=Client, on_delete=models.SET_NULL, null=True)
+    contract = models.ForeignKey(to=Contract, on_delete=models.SET_NULL, null=True)
     support_contact = models.ForeignKey(to=User, on_delete=models.SET_NULL, null=True)
     objects = models.Manager()
