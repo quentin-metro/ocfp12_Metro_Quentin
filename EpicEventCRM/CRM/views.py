@@ -1,24 +1,27 @@
 from django.contrib.auth.models import User
+from django.shortcuts import redirect
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.shortcuts import redirect
 
+from .filters import ClientFilter, ContractFilter, EventFilter
 from .models import Client, Contract, Event
 from .permissions import IsSalesmen, IsManagermen, IsSupportmen
 from .permissions import IsAssignedToClient, IsAssignedToContract, IsAssignedToEvent
 from .serializers import UserSerializer, ClientSerializer, ContractSerializer, EventSerializer
 
-"""@api_view(['POST'])
-ne peut s'inscrire , doit etre creer par un gestionnaire
+"""
+@api_view(['POST'])
+Can't signup , need to be created by a manager
 def signup_view(request):
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
         serializer.create(request.data)
         return Response(serializer.data, status=status.HTTP_200_OK)
     else:
-        return Response("Invalid request", status=status.HTTP_400_BAD_REQUEST)"""
+        return Response("Invalid request", status=status.HTTP_400_BAD_REQUEST)
+"""
 
 
 @api_view(['GET'])
@@ -27,9 +30,9 @@ def login_redirect(request):
     if request.user.groups.filter(name="Salesmen").exists():
         return redirect('clients')
     elif request.user.groups.filter(name="Supportmen").exists():
-        return redirect('event')
+        return redirect('events')
     elif request.user.groups.filter(name="Managermen").exists():
-        return redirect('admin')
+        return Response(status=status.HTTP_200_OK)
     else:
         return Response(status=status.HTTP_403_FORBIDDEN)
 
@@ -41,9 +44,13 @@ def client_get_list(request):
     # GET list of client
     if request.method == 'GET':
         if request.user.groups.filter(name="Salesmen").exists():
-            clients_list = Client.objects.filter(sales_contact=request.user).all()
+            clients_list = ClientFilter(request,
+                                        queryset=Client.objects.filter(sales_contact=request.user).all()
+                                        ).filtered()
         else:
-            clients_list = Client.objects.all()
+            clients_list = ClientFilter(request,
+                                        queryset=Client.objects.filter(sales_contact=request.user).all()
+                                        ).filtered()
         if clients_list:
             serializer = ClientSerializer(clients_list, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -91,10 +98,12 @@ def client_handler(request, client_id):
         # Modify a new client
         if request.method == 'PUT':
             sales_contact = None
+            sales_contact_change = False
             # Allow modifying contact , only for manager
             if request.user.groups.filter(name="Salesmen").exists():
                 sales_contact = request.user.id
             elif 'sales_contact' in request.form:
+                sales_contact_change = True
                 sales_contact = request.data['sales_contact']
             data = {
                 "id": client_id,
@@ -109,10 +118,11 @@ def client_handler(request, client_id):
             }
             serializer = ClientSerializer(data=data)
             if serializer.is_valid():
+                if sales_contact_change:
+                    serializer.edit_contact(sales_contact)
                 client = serializer.edit(data)
-                augmented_serializer_data = serializer.data
-                augmented_serializer_data['id'] = client.id
-                return Response(augmented_serializer_data, status=status.HTTP_200_OK)
+                serializer = ClientSerializer(client)
+                return Response(serializer.data, status=status.HTTP_200_OK)
             else:
                 return Response(serializer.errors, status=status.HTTP_406_NOT_ACCEPTABLE)
     else:
@@ -175,9 +185,13 @@ def contract_get_list(request):
     # GET list of contracts
     if request.method == 'GET':
         if request.user.groups.filter(name="Salesmen").exists():
-            contracts_list = Contract.objects.filter(sales_contact=request.user).all()
+            contracts_list = ContractFilter(request,
+                                            queryset=Contract.objects.filter(sales_contact=request.user).all()
+                                            ).filtered()
         else:
-            contracts_list = Contract.objects.all()
+            contracts_list = ContractFilter(request,
+                                            queryset=Contract.objects.all()
+                                            ).filtered()
         if contracts_list:
             serializer = ContractSerializer(contracts_list, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -198,10 +212,12 @@ def contract_handler(request, contract_id):
         # Modify a contract
         if request.method == 'PUT':
             sales_contact = None
+            sales_contact_change = False
             # Allow modifying contact , only for manager
             if request.user.groups.filter(name="Salesmen").exists():
                 sales_contact = request.user.id
             elif 'sales_contact' in request.form:
+                sales_contact_change = True
                 sales_contact = request.data['sales_contact']
             data = {
                 "id": contract_id,
@@ -212,6 +228,8 @@ def contract_handler(request, contract_id):
             }
             serializer = ContractSerializer(data=data)
             if serializer.is_valid():
+                if sales_contact_change:
+                    serializer.edit_contact(sales_contact)
                 contract = serializer.edit(data)
                 serializer = ContractSerializer(contract)
                 return Response(serializer.data, status=status.HTTP_200_OK)
@@ -270,9 +288,11 @@ def event_get_list(request):
     # GET list of event
     if request.method == 'GET':
         if request.user.groups.filter(name="Supportmen").exists():
-            events_list = Event.objects.filter(support_contact=request.user).all()
+            events_list = EventFilter(request,
+                                      queryset=Event.objects.filter(support_contact=request.user).all()
+                                      ).filtered()
         else:
-            events_list = Event.objects.all()
+            events_list = EventFilter(request.GET, queryset=Event.objects.all()).filtered()
         if events_list:
             serializer = EventSerializer(events_list, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -292,10 +312,12 @@ def event_handler(request, event_id):
         # Modify a event
         if request.method == 'PUT':
             support_contact = None
+            support_contact_change = False
             # Allow modifying contact , only for manager
             if request.user.groups.filter(name="Supportmen").exists():
                 support_contact = request.user.id
             elif 'support_contact' in request.form:
+                support_contact_change = True
                 support_contact = request.data['support']
             data = {
                 'id': event_id,
@@ -307,6 +329,8 @@ def event_handler(request, event_id):
             }
             serializer = EventSerializer(data=data)
             if serializer.is_valid():
+                if support_contact_change:
+                    serializer.edit_contact(support_contact)
                 event = serializer.edit(data)
                 serializer = EventSerializer(event)
                 return Response(serializer.data, status=status.HTTP_200_OK)
@@ -341,3 +365,4 @@ def event_client(request, event_id):
             client = Client.objects.get(id=client_id)
             serializer = ClientSerializer(client)
             return Response(serializer.data, status=status.HTTP_200_OK)
+

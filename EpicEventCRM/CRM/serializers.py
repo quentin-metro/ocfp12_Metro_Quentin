@@ -72,6 +72,15 @@ class ClientSerializer(ModelSerializer):
         client.save()
         return client
 
+    def edit_contact(self, new_contact):
+        sales_contact = User.objects.get(id=new_contact)
+        client = Client.objects.get(id=new_contact)
+        client.id = client.id
+        client.sales_contact = sales_contact
+        client.date_updated = timezone.now()
+        client.save()
+        return client
+
     def convert(self):
         client_id = self.data['id']
         client = Client.objects.get(id=client_id)
@@ -113,6 +122,16 @@ class ContractSerializer(ModelSerializer):
         contract.id = contract.id
         contract.amount = data['amount']
         contract.payment_due = data['payment_due']
+        contract.date_updated = timezone.now()
+        contract.save()
+        return contract
+
+
+    def edit_contact(self, new_contact):
+        sales_contact = User.objects.get(id=new_contact)
+        contract = Contract.objects.get(id=new_contact)
+        contract.id = contract.id
+        contract.sales_contact = sales_contact
         contract.date_updated = timezone.now()
         contract.save()
         return contract
@@ -166,12 +185,19 @@ class EventSerializer(ModelSerializer):
         return event
 
     def edit(self, data):
-        support_contact = User.objects.get(id=data['support_contact'])
         event = Event.objects.get(id=data['id'])
         event.id = event.id
         event.attendees = data['attendees']
         event.date_event = data['date_event']
         event.notes = data['notes']
+        event.date_updated = timezone.now()
+        event.save()
+        return event
+
+    def edit_contact(self, new_contact):
+        support_contact = User.objects.get(id=new_contact)
+        event = Event.objects.get(id=new_contact)
+        event.id = event.id
         event.support_contact = support_contact
         event.date_updated = timezone.now()
         event.save()
