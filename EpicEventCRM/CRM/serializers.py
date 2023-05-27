@@ -1,4 +1,3 @@
-from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
@@ -68,7 +67,6 @@ class ClientSerializer(ModelSerializer):
         client.first_name = data['first_name']
         client.last_name = data['last_name']
         client.isConverted = client.isConverted
-        client.date_updated = timezone.now()
         client.save()
         return client
 
@@ -77,7 +75,6 @@ class ClientSerializer(ModelSerializer):
         client = Client.objects.get(id=new_contact)
         client.id = client.id
         client.sales_contact = sales_contact
-        client.date_updated = timezone.now()
         client.save()
         return client
 
@@ -85,7 +82,6 @@ class ClientSerializer(ModelSerializer):
         client_id = self.data['id']
         client = Client.objects.get(id=client_id)
         client.isConverted = True
-        client.date_updated = timezone.now()
         client.save()
         return client
 
@@ -122,7 +118,6 @@ class ContractSerializer(ModelSerializer):
         contract.id = contract.id
         contract.amount = data['amount']
         contract.payment_due = data['payment_due']
-        contract.date_updated = timezone.now()
         contract.save()
         return contract
 
@@ -132,7 +127,6 @@ class ContractSerializer(ModelSerializer):
         contract = Contract.objects.get(id=new_contact)
         contract.id = contract.id
         contract.sales_contact = sales_contact
-        contract.date_updated = timezone.now()
         contract.save()
         return contract
 
@@ -148,7 +142,6 @@ class ContractSerializer(ModelSerializer):
         else:
             contract.id = contract.id
             contract.status = True
-            contract.date_updated = timezone.now()
             contract.save()
             return contract
 
@@ -190,7 +183,6 @@ class EventSerializer(ModelSerializer):
         event.attendees = data['attendees']
         event.date_event = data['date_event']
         event.notes = data['notes']
-        event.date_updated = timezone.now()
         event.save()
         return event
 
@@ -199,7 +191,6 @@ class EventSerializer(ModelSerializer):
         event = Event.objects.get(id=new_contact)
         event.id = event.id
         event.support_contact = support_contact
-        event.date_updated = timezone.now()
         event.save()
         return event
 
@@ -209,7 +200,6 @@ class EventSerializer(ModelSerializer):
         event = Event.objects.get(id=event_id)
         event.id = event.id
         event.status = True
-        event.date_updated = timezone.now()
         event.save()
         # Finish the associated contract
         if event.contract is not None:

@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+import logging
 from django.shortcuts import redirect
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -9,11 +9,14 @@ from .filters import ClientFilter, ContractFilter, EventFilter
 from .models import Client, Contract, Event
 from .permissions import IsSalesmen, IsManagermen, IsSupportmen
 from .permissions import IsAssignedToClient, IsAssignedToContract, IsAssignedToEvent
-from .serializers import UserSerializer, ClientSerializer, ContractSerializer, EventSerializer
+from .serializers import ClientSerializer, ContractSerializer, EventSerializer
+# from .serializers import UserSerializer,
+
+logger = logging.getLogger(__name__)
 
 """
 @api_view(['POST'])
-Can't signup , need to be created by a manager
+Can't signup , need to be created by a manager by admin site
 def signup_view(request):
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
@@ -27,6 +30,7 @@ def signup_view(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def login_redirect(request):
+    logger.info(f"\'{request.user}\' connected")
     if request.user.groups.filter(name="Salesmen").exists():
         return redirect('clients')
     elif request.user.groups.filter(name="Supportmen").exists():
@@ -39,10 +43,11 @@ def login_redirect(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, (IsSalesmen or IsManagermen)])
+@permission_classes([IsAuthenticated, (IsSalesmen | IsManagermen)])
 def client_get_list(request):
     # GET list of client
     if request.method == 'GET':
+        logger.info(f"\'{request.user}\' GET client_get_list")
         if request.user.groups.filter(name="Salesmen").exists():
             clients_list = ClientFilter(request,
                                         queryset=Client.objects.filter(sales_contact=request.user).all()
@@ -59,10 +64,11 @@ def client_get_list(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, (IsSalesmen or IsManagermen)])
+@permission_classes([IsAuthenticated, (IsSalesmen | IsManagermen)])
 def client_create(request):
     # Create a new client
     if request.method == 'POST':
+        logger.info(f"\'{request.user}\' POST client_create")
         sales_contact = None
         if request.user.groups.filter(name="Salesmen").exists():
             sales_contact = request.user.id
@@ -79,24 +85,25 @@ def client_create(request):
         serializer = ClientSerializer(data=data)
         if serializer.is_valid():
             client = serializer.create(data)
-            augmented_serializer_data = serializer.data
-            augmented_serializer_data['id'] = client.id
-            return Response(augmented_serializer_data, status=status.HTTP_200_OK)
+            serializer = ClientSerializer(client)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             return Response(serializer.errors, status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 @api_view(['GET', 'PUT'])
-@permission_classes([IsAuthenticated, (IsAssignedToClient or IsManagermen)])
+@permission_classes([IsAuthenticated, (IsAssignedToClient | IsManagermen)])
 def client_handler(request, client_id):
     if Client.objects.filter(id=client_id).exists():
+        client = Client.objects.get(id=client_id)
         # Get details of a specific client
         if request.method == 'GET':
-            client = Client.objects.get(id=client_id)
+            logger.info(f"\'{request.user}\' GET client_handler \'{client.company_name}\'")
             serializer = ClientSerializer(client)
             return Response(serializer.data, status=status.HTTP_200_OK)
         # Modify a new client
         if request.method == 'PUT':
+            logger.info(f"\'{request.user}\' PUT client_handler  \'{client.company_name}\'")
             sales_contact = None
             sales_contact_change = False
             # Allow modifying contact , only for manager
@@ -113,7 +120,6 @@ def client_handler(request, client_id):
                 "mobile": request.data['mobile'],
                 "first_name": request.data['first_name'],
                 "last_name": request.data['last_name'],
-                "isConverted": request.data['isConverted'],
                 "sales_contact": sales_contact
             }
             serializer = ClientSerializer(data=data)
@@ -124,16 +130,18 @@ def client_handler(request, client_id):
                 serializer = ClientSerializer(client)
                 return Response(serializer.data, status=status.HTTP_200_OK)
             else:
+                logger.info(f"\'{request.user}\' PUT client_handler  \'{client.company_name}\' HTTP_406_NOT_ACCEPTABLE")
                 return Response(serializer.errors, status=status.HTTP_406_NOT_ACCEPTABLE)
     else:
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, (IsAssignedToClient or IsManagermen)])
+@permission_classes([IsAuthenticated, (IsAssignedToClient | IsManagermen)])
 def client_convert(request, client_id):
     if Client.objects.filter(id=client_id).exists():
         client = Client.objects.get(id=client_id)
+        logger.info(f"\'{request.user}\' POST client_convert \'{client.company_name}\' ")
         serializer = ClientSerializer(client)
         serializer.convert()
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -142,12 +150,13 @@ def client_convert(request, client_id):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated, (IsAssignedToClient or IsManagermen)])
+@permission_classes([IsAuthenticated, (IsAssignedToClient | IsManagermen)])
 def client_get_contract_or_sign(request, client_id):
     if Client.objects.filter(id=client_id).exists():
         client = Client.objects.get(id=client_id)
         # GET list of contract of the clients
         if request.method == 'GET':
+            logger.info(f"\'{request.user}\' GET client_get_contract_or_sign \'{client.company_name}\' ")
             contracts_list = Contract.objects.filter(client=client).all()
             if contracts_list:
                 serializer = ContractSerializer(contracts_list, many=True)
@@ -155,6 +164,7 @@ def client_get_contract_or_sign(request, client_id):
             else:
                 return Response({}, status=status.HTTP_200_OK)
         elif request.method == "POST":
+            logger.info(f"\'{request.user}\' POST client_get_contract_or_sign \'{client.company_name}\' ")
             if client.sales_contact is not None:
                 data = {
                     'amount': request.data['amount'],
@@ -167,6 +177,7 @@ def client_get_contract_or_sign(request, client_id):
                 if serializer.is_valid():
                     contract = serializer.create(data)
                     serializer = ContractSerializer(contract)
+                    logger.info(f"\'{request.user}\' POST client_get_contract_or_sign \'{contract.id}\' created")
                     return Response(serializer.data, status=status.HTTP_200_OK)
                 else:
                     return Response(serializer.errors, status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -180,10 +191,11 @@ def client_get_contract_or_sign(request, client_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, (IsSalesmen or IsManagermen)])
+@permission_classes([IsAuthenticated, (IsSalesmen | IsManagermen)])
 def contract_get_list(request):
     # GET list of contracts
     if request.method == 'GET':
+        logger.info(f"\'{request.user}\' GET contract_get_list")
         if request.user.groups.filter(name="Salesmen").exists():
             contracts_list = ContractFilter(request,
                                             queryset=Contract.objects.filter(sales_contact=request.user).all()
@@ -201,16 +213,18 @@ def contract_get_list(request):
 
 
 @api_view(['GET', 'PUT'])
-@permission_classes([IsAuthenticated, (IsAssignedToContract or IsManagermen)])
+@permission_classes([IsAuthenticated, (IsAssignedToContract | IsManagermen)])
 def contract_handler(request, contract_id):
     if Contract.objects.filter(id=contract_id).exists():
+        contract = Contract.objects.get(id=contract_id)
         # Get details of a contract
         if request.method == 'GET':
-            contract = Contract.objects.get(id=contract_id)
+            logger.info(f"\'{request.user}\' GET contract_handler \'{contract.id}\' ")
             serializer = ContractSerializer(contract)
             return Response(serializer.data, status=status.HTTP_200_OK)
         # Modify a contract
         if request.method == 'PUT':
+            logger.info(f"\'{request.user}\' GET contract_handler \'{contract.id}\' ")
             sales_contact = None
             sales_contact_change = False
             # Allow modifying contact , only for manager
@@ -240,10 +254,11 @@ def contract_handler(request, contract_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, (IsAssignedToContract or IsManagermen)])
+@permission_classes([IsAuthenticated, (IsAssignedToContract | IsManagermen)])
 def contract_event(request, contract_id):
     if Contract.objects.filter(id=contract_id).exists():
         contract = Contract.objects.get(id=contract_id)
+        logger.info(f"\'{request.user}\' POST contract_event \'{contract.id}\' ")
         if Event.objects.filter(contract=contract_id).exists():
             return Response(
                 {"Error": "This contract already have a event"},
@@ -262,6 +277,7 @@ def contract_event(request, contract_id):
             serializer = EventSerializer(data=data)
             if serializer.is_valid():
                 event = serializer.create(data)
+                logger.info(f"{request.user} POST contract_event \'{contract.id}\' created \'{event}\' ")
                 serializer = EventSerializer(event)
             return Response(serializer.data, status=status.HTTP_200_OK)
     else:
@@ -270,12 +286,13 @@ def contract_event(request, contract_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, (IsAssignedToContract or IsManagermen)])
+@permission_classes([IsAuthenticated, (IsAssignedToContract | IsManagermen)])
 def contract_client(request, contract_id):
     if Contract.objects.filter(id=contract_id).exists():
         # Get details of the client associated to this contract
         if request.method == 'GET':
             contract = Contract.objects.get(id=contract_id)
+            logger.info(f"\'{request.user}\' GET contract_client \'{contract.id}\' ")
             client_id = contract.client.id
             client = Client.objects.get(id=client_id)
             serializer = ClientSerializer(client)
@@ -283,10 +300,11 @@ def contract_client(request, contract_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, (IsSupportmen or IsManagermen)])
+@permission_classes([IsAuthenticated, (IsSupportmen | IsManagermen)])
 def event_get_list(request):
     # GET list of event
     if request.method == 'GET':
+        logger.info(f"\'{request.user}\' GET event_get_list ")
         if request.user.groups.filter(name="Supportmen").exists():
             events_list = EventFilter(request,
                                       queryset=Event.objects.filter(support_contact=request.user).all()
@@ -301,16 +319,18 @@ def event_get_list(request):
 
 
 @api_view(['GET', 'PUT'])
-@permission_classes([IsAuthenticated, (IsAssignedToEvent or IsManagermen)])
+@permission_classes([IsAuthenticated, (IsAssignedToEvent | IsManagermen)])
 def event_handler(request, event_id):
     if Event.objects.filter(id=event_id).exists():
+        event = Event.objects.get(id=event_id)
         # Get details of an event
         if request.method == 'GET':
-            event = Event.objects.get(id=event_id)
+            logger.info(f"\'{request.user}\' GET event_handler \'{event.id}\' ")
             serializer = EventSerializer(event)
             return Response(serializer.data, status=status.HTTP_200_OK)
         # Modify a event
         if request.method == 'PUT':
+            logger.info(f"\'{request.user}\' PUT event_handler \'{event.id}\' ")
             support_contact = None
             support_contact_change = False
             # Allow modifying contact , only for manager
@@ -341,11 +361,12 @@ def event_handler(request, event_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, (IsAssignedToEvent or IsManagermen)])
+@permission_classes([IsAuthenticated, (IsAssignedToEvent | IsManagermen)])
 def event_end(request, event_id):
     if Event.objects.filter(id=event_id).exists():
         if request.method == 'POST':
             event = Event.objects.get(id=event_id)
+            logger.info(f"\'{request.user}\' POST event_end \'{event.id}\' ended")
             serializer = EventSerializer(event)
             event = serializer.end()
             serializer = EventSerializer(event)
@@ -355,14 +376,14 @@ def event_end(request, event_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, (IsAssignedToEvent or IsManagermen)])
+@permission_classes([IsAuthenticated, (IsAssignedToEvent | IsManagermen)])
 def event_client(request, event_id):
     if Event.objects.filter(id=event_id).exists():
         # Get details of the client associated to this event
         if request.method == 'GET':
             event = Event.objects.get(id=event_id)
+            logger.info(f"\'{request.user}\' GET event_client \'{event}\' ")
             client_id = event.client.id
             client = Client.objects.get(id=client_id)
             serializer = ClientSerializer(client)
             return Response(serializer.data, status=status.HTTP_200_OK)
-
