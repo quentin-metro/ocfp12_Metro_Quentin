@@ -15,6 +15,6 @@ Cette application est un CRM permettant de gérer des clients et leurs contrats 
 - puis la commande `python .\SoftDesk_Project_API\manage.py runserver` pour lancer le serveur.
 
 
-## Utilisation et documentation
+## Utilisation
 Vous pouvez accéder à cette API via des logiciels tels que POSTMAN ou via des request HTTP.
 L'application est également configurée pour une utilisation sur le site admin `url/admin/`.
