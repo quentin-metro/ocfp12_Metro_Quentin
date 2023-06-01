@@ -18,3 +18,17 @@ Cette application est un CRM permettant de gérer des clients et leurs contrats 
 ## Utilisation
 Vous pouvez accéder à cette API via des logiciels tels que POSTMAN ou via des request HTTP.
 L'application est également configurée pour une utilisation sur le site admin `url/admin/`.
+Divers utilisateurs sont configurés pour pouvoir test l'application (Ne pas garder en cas de production)
+admin
+    super_toto super_mdp
+manager
+    managerman1 mdp012345
+    managerman2 mdp012345
+vendeur
+    salesman1 mdp012345
+    salesman2 mdp012345
+    salesman3 mdp012345
+support
+    supportman1 mdp012345
+    supportman2 mdp012345
+    supportman3 mdp012345
